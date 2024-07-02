@@ -10,7 +10,10 @@ const svg = d3.create("svg")
 
 function isVisible(coords) {
     const [lambda, phi] = projection.rotate();
-    const rotated = d3.geoRotation([-lambda, phi])(coords);
+    const rotated = d3.geoRotation([lambda, phi])(coords);
+    console.log("coordinates",coords)
+    console.log('lambda, phi',lambda, phi)
+    console.log("rotated",rotated)
     return rotated[0] >= -90 && rotated[0] <= 90;
     }
 
@@ -29,7 +32,10 @@ const zoom = d3.zoom()
 
 let g;
 let circle;
-const point = { type: "Point", coordinates: [2.3522, 48.8566] }; // Example: Paris
+// const point = { type: "Point", coordinates: [2.3522, 48.8566] }; // Example: Paris longtitude/latitude
+const point = { type: "Point", coordinates: [-43.1728, -22.9068] }; 
+
+// const point = { type: "Point", coordinates: [103.8198, 1.3521] }; 
 
     
 
@@ -42,17 +48,12 @@ function zoomToCircle(coordinates) {
         return function(t) {
             projection.rotate(r(t));
             svg.selectAll("path").attr("d", path);
-            console.log(projection(coordinates))
             
             circle
             .attr("cx", projection(coordinates)[0])
             .attr("cy", projection(coordinates)[1]);
-        };
+        }
     })
-    // .call(zoom.transform, d3.zoomIdentity.scale(scale));
-    // .call(zoom.transform, d3.zoomIdentity.translate(...translate).scale(scale));
-
-    // 
   }
 
   const drag = d3.drag().subject(function() {
@@ -67,31 +68,26 @@ function dragged(event) {
     const lambda = event.x;
     const phi = -event.y;
     projection.rotate([lambda, phi, rotation[2]]); 
-//   console.log("THERE",projection.rotate())
   svg.selectAll("path").attr("d", path);
   
   const [x, y] = projection(point.coordinates);
   circle.attr('cx', x)
             .attr('cy', y)
-            .attr("class", d=>isVisible(point.coordinates)? "point":"point hidden" )
+            .attr("class", isVisible(point.coordinates)? "point":"point hidden" )
 }
 
 function zoomed(event) {
     // const {transform} = event;
     const {transform} = event;
-    const scaleThreshold = 1.5; // Set a threshold scale to zoom back to identity
-  const currentScale = event.transform.k;
-    console.log(event)
-    
-    if (currentScale < scaleThreshold) {
-        circle.attr("transform", d3.zoomIdentity)
-        g.attr("transform", d3.zoomIdentity);
-
-    }
-    else{
-        circle.attr("transform", transform)
+  const zoomCenterX = width / 2;
+  const zoomCenterY = height / 2;
+  const zoomScale = event.transform.k; // Example: Zoom to scale 2 
+  const newX = width / 2 - zoomCenterX * zoomScale;
+  const newY = height / 2 - zoomCenterY * zoomScale; 
+transform.x = newX;
+transform.y = newY
+circle.attr("transform", transform )
     g.attr("transform", transform);
-}
     
 }
 
@@ -102,8 +98,9 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
 // fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json")
     .then(response => response.json())
     .then(data => {
-
+        console.log(topojson.feature(data, data.objects.countries).features)
         g=svg.append('g')
+        g.append("path").data({type:"Sphere"})
         g
             .attr("fill", "#444")
             .attr("cursor", "pointer")
@@ -117,15 +114,14 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
 
         // Convert the coordinates to the SVG coordinates
         const [x, y] = projection(point.coordinates);
-    
         // Draw the point
         circle=svg.append('circle')
         circle
             .attr("fill", "red")
-            .attr('class', 'point')
             .attr('cx', x)
             .attr('cy', y)
             .attr('r', 5)
+            .attr('class', isVisible(point.coordinates)? "point":"point hidden")
             .on('click', (e) => {
                 e.stopPropagation();
                 zoomToCircle(point.coordinates)
