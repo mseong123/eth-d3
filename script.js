@@ -71,21 +71,21 @@ function dragged(event) {
   svg.selectAll("path").attr("d", path);
   
   const [x, y] = projection(point.coordinates);
-  circle.selectAll("circle").attr('cx', x)
-            .attr('cy', y)
+  circle.selectAll("circle").attr('cx', d=>projection(d.coordinates)[0])
+            .attr('cy', d=>projection(d.coordinates)[1])
             .attr("class", isVisible(point.coordinates)? "point":"point hidden" )
 }
 
 function zoomed(event) {
     // const {transform} = event;
     const {transform} = event;
-  const zoomCenterX = width / 2;
-  const zoomCenterY = height / 2;
-  const zoomScale = event.transform.k; // Example: Zoom to scale 2 
-  const newX = width / 2 - zoomCenterX * zoomScale;
-  const newY = height / 2 - zoomCenterY * zoomScale; 
-transform.x = newX;
-transform.y = newY;
+    const zoomCenterX = width / 2;
+    const zoomCenterY = height / 2;
+    const zoomScale = event.transform.k; // Example: Zoom to scale 2 
+    const newX = width / 2 - zoomCenterX * zoomScale;
+    const newY = height / 2 - zoomCenterY * zoomScale; 
+    transform.x = newX;
+    transform.y = newY;
     circle.attr("transform", transform )
     g.attr("transform", transform);
     water.attr("transform", transform)
@@ -106,19 +106,19 @@ function zoomEnded(event) {
     });
     circle.select("circle").datum(d=>d.children[0])
     
-    circle.select("circle").transition().duration(750)
+    circle.select("circle").transition().duration(150)
     .attr("cx",d=>projection(d.coordinates)[0])
     .attr("cy",d=>projection(d.coordinates)[1])
     
     .attr("r", 7)
     .attr("fill", "yellow")
-    circle1.transition().duration(750)
+    circle1.transition().duration(150)
     .attr("cx",d=>projection(d.coordinates)[0])
     .attr("cy",d=>projection(d.coordinates)[1])
     .attr("r", 7)
     .attr("fill", "yellow")
     
-    circle2.transition().duration(750)
+    circle2.transition().duration(150)
     .attr("cx",d=>projection(d.coordinates)[0])
     .attr("cy",d=>projection(d.coordinates)[1])
     .attr("r", 7)
@@ -128,7 +128,7 @@ function zoomEnded(event) {
     circle.append(()=>circle2.node())
     }
     else if (event.transform.k < 2 && circle.selectAll("circle").size() == 3) {
-        circle.selectAll("circle").transition().duration(750)
+        circle.selectAll("circle").transition().duration(150)
         .attr("cx",d=>projection(point.coordinates)[0])
         .attr("cy",d=>projection(point.coordinates)[1])
         .attr("r", 15)
