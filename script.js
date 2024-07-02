@@ -11,14 +11,11 @@ const svg = d3.create("svg")
 function isVisible(coords) {
     const [lambda, phi] = projection.rotate();
     const rotated = d3.geoRotation([lambda, phi])(coords);
-    console.log("coordinates",coords)
-    console.log('lambda, phi',lambda, phi)
-    console.log("rotated",rotated)
     return rotated[0] >= -90 && rotated[0] <= 90;
     }
 
 
-const projection = d3.geoOrthographic().translate([width/2, height/2]).clipAngle(90)
+const projection = d3.geoOrthographic().translate([width/2, height/2]).clipAngle(90).scale(350)
 const path = d3.geoPath(projection)
 
 const zoom = d3.zoom()
@@ -26,32 +23,35 @@ const zoom = d3.zoom()
     .filter((event)=>{
         return event.type === "wheel" || event.type === "dblclick"
     })
-    .on("zoom", zoomed);
+    .on("zoom", zoomed).on("end", zoomEnded);
 
 
 
 let g;
 let circle;
-// const point = { type: "Point", coordinates: [2.3522, 48.8566] }; // Example: Paris longtitude/latitude
-const point = { type: "Point", coordinates: [-43.1728, -22.9068] }; 
-
-// const point = { type: "Point", coordinates: [103.8198, 1.3521] }; 
+let water;
+const point = { country: "France", coordinates: [2.3522, 48.8566], 
+    children:[
+        {location:"Paris",coordinates:[2.2137,46.2276]} ,
+        {location:"Scotland", coordinates:[-3.1883,55.9533]},
+        {location:"Berlin", coordinates:[13.4050,52.5200]}
+    ]}; //longtitude/latitude
+// const point = { country: "Brazil", coordinates: [-43.1728, -22.9068],  };//rio de janeiro 
+// const point = { type: "Point", coordinates: [103.8198, 1.3521] }; //singapore
 
     
 
 function zoomToCircle(coordinates) {
-    const [x, y] = projection(coordinates);
-    const scale = 4; // Example: Zoom in by a factor of 4
-    const translate = [width / 2 - x * scale, height / 2 - y * scale];
     svg.transition().duration(750).tween("rotate", function() {
         const r = d3.interpolate(projection.rotate(), [-coordinates[0],-coordinates[1]]);
         return function(t) {
             projection.rotate(r(t));
             svg.selectAll("path").attr("d", path);
+            circle.selectAll("circle")
+            .attr("cx", d=>projection(d.coordinates)[0])
+            .attr("cy", d=>projection(d.coordinates)[1]);
             
-            circle
-            .attr("cx", projection(coordinates)[0])
-            .attr("cy", projection(coordinates)[1]);
+           
         }
     })
   }
@@ -71,7 +71,7 @@ function dragged(event) {
   svg.selectAll("path").attr("d", path);
   
   const [x, y] = projection(point.coordinates);
-  circle.attr('cx', x)
+  circle.selectAll("circle").attr('cx', x)
             .attr('cy', y)
             .attr("class", isVisible(point.coordinates)? "point":"point hidden" )
 }
@@ -85,10 +85,61 @@ function zoomed(event) {
   const newX = width / 2 - zoomCenterX * zoomScale;
   const newY = height / 2 - zoomCenterY * zoomScale; 
 transform.x = newX;
-transform.y = newY
-circle.attr("transform", transform )
+transform.y = newY;
+    circle.attr("transform", transform )
     g.attr("transform", transform);
+    water.attr("transform", transform)
     
+}
+
+function zoomEnded(event) {
+    if (event.transform.k >= 2 && circle.selectAll("circle").size() != 3) {
+
+    
+    let circle1 = circle.select("circle").clone(true).datum(d=>d.children[1]).attr("class", "circle1").on('click', function(e,d) {
+        e.stopPropagation();
+        zoomToCircle(d.coordinates)
+    });
+    let circle2 = circle.select("circle").clone(true).datum(d=>d.children[2]).attr("class", "circle2").on('click', function(e,d) {
+        e.stopPropagation();
+        zoomToCircle(d.coordinates)
+    });
+    circle.select("circle").datum(d=>d.children[0])
+    
+    circle.select("circle").transition().duration(750)
+    .attr("cx",d=>projection(d.coordinates)[0])
+    .attr("cy",d=>projection(d.coordinates)[1])
+    
+    .attr("r", 7)
+    .attr("fill", "yellow")
+    circle1.transition().duration(750)
+    .attr("cx",d=>projection(d.coordinates)[0])
+    .attr("cy",d=>projection(d.coordinates)[1])
+    .attr("r", 7)
+    .attr("fill", "yellow")
+    
+    circle2.transition().duration(750)
+    .attr("cx",d=>projection(d.coordinates)[0])
+    .attr("cy",d=>projection(d.coordinates)[1])
+    .attr("r", 7)
+    .attr("fill", "yellow")
+    
+    circle.append(()=>circle1.node())
+    circle.append(()=>circle2.node())
+    }
+    else if (event.transform.k < 2 && circle.selectAll("circle").size() == 3) {
+        circle.selectAll("circle").transition().duration(750)
+        .attr("cx",d=>projection(point.coordinates)[0])
+        .attr("cy",d=>projection(point.coordinates)[1])
+        .attr("r", 15)
+        .attr("fill", "red").on("end", function(){
+            let childNodes = this.parentNode.childNodes;
+            if(this===childNodes[1] || this ===childNodes[2])
+                d3.select(this).remove()
+        })
+        circle.select("circle").datum(point)
+
+    }
 }
 
 
@@ -99,14 +150,14 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
     .then(response => response.json())
     .then(data => {
         console.log(topojson.feature(data, data.objects.countries).features)
+        water=svg.append("path")
+        water.datum({type:"Sphere"}).attr("d", path).attr("fill", "#40E0D0")
         g=svg.append('g')
-        g.append("path").data({type:"Sphere"})
         g
             .attr("fill", "#444")
             .attr("cursor", "pointer")
             
             .selectAll("path")
-            // .data(data.features)
             .data(topojson.feature(data, data.objects.countries).features)
             .join("path")
             .attr("d", path);
@@ -115,17 +166,19 @@ fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
         // Convert the coordinates to the SVG coordinates
         const [x, y] = projection(point.coordinates);
         // Draw the point
-        circle=svg.append('circle')
-        circle
+        circle=svg.append('g').attr("class", "circle")        
+        circle.append("circle")
             .attr("fill", "red")
-            .attr('cx', x)
-            .attr('cy', y)
-            .attr('r', 5)
-            .attr('class', isVisible(point.coordinates)? "point":"point hidden")
-            .on('click', (e) => {
+            .datum(point)
+            .text("Europe")
+            .attr('cx', d=>projection(d.coordinates)[0])
+            .attr('cy', d=>projection(d.coordinates)[1])
+            .attr('r',15)
+            .attr('class',function(d){return isVisible(d.coordinates)? "point": "point hidden"})
+            .on('click', function(e,d) {
                 e.stopPropagation();
-                zoomToCircle(point.coordinates)
-            });
+                zoomToCircle(d.coordinates)
+            }); 
         svg.call(zoom).call(drag)
 
         
